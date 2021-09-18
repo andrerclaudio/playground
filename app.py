@@ -88,8 +88,8 @@ def application():
             img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
             # Choose the values based on the color on the point/mark
-            lower_green = np.array([0, 150, 0])
-            upper_green = np.array([[140, 255, 35]])
+            lower_green = np.array([0, 130, 0])
+            upper_green = np.array([[195, 255, 85]])
             filter_green = cv2.inRange(img_rgb, lower_green, upper_green)
 
             # cv2.imshow("Lights", filter_green)
@@ -109,7 +109,7 @@ def application():
 
                 # draw the center of the shape on the image
                 cv2.circle(frame, (cx, cy), 15, (0, 0, 255), 2)
-                # cv2.drawContours(output, [c], 0, (255, 255, 255), 1)
+                cv2.drawContours(frame, [c], 0, (255, 255, 255), 1)
 
             cv2.imshow("Lights", frame)
 
