@@ -4,6 +4,7 @@ from datetime import timedelta
 
 # Added modules
 import cv2
+import numpy as np
 from pytictoc import TicToc
 
 # Project modules
@@ -16,8 +17,7 @@ logging.basicConfig(level=logging.INFO,
 
 logger = logging.getLogger(__name__)
 
-IMAGE_PATH = "./pics/image.jpg"
-CASCADE_PATH = "haarcascade_frontalface_default.xml"
+IMAGE_PATH = "./pics/lights.png"
 
 
 class ElapsedTime(object):
@@ -35,49 +35,63 @@ class ElapsedTime(object):
         logger.info('< {} >'.format(d))
 
 
+def resize(image, proportion=0.3):
+    """
+
+    """
+
+    width = int(image.shape[1] * proportion / 100)
+    height = int(image.shape[0] * proportion / 100)
+    dim = (width, height)
+
+    resized = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
+    logger.debug(f'Resized dimensions: {resized.shape}')
+    return resized
+
+
 def application():
     """" All application has its initialization from here """
     logger.info('Main application is running!')
 
     tm = ElapsedTime()
-
-    # Create the haar cascade
-    face_cascade = cv2.CascadeClassifier(CASCADE_PATH)
-
     image = False
 
     try:
 
         image = cv2.imread(IMAGE_PATH)
+        output = image.copy()
         logger.info(f'Original dimensions: {image.shape}')
 
-        scale_percent = 20  # percent of original size
-        width = int(image.shape[1] * scale_percent / 100)
-        height = int(image.shape[0] * scale_percent / 100)
-        dim = (width, height)
+        # Convert to RGB format
+        img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        img_hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-        # resize image and show
-        resized = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
-        logger.debug(f'Resized dimensions: {resized.shape}')
+        # Choose the values based on the color on the point/mark
+        lower_green = np.array([0, 200, 0])
+        upper_green = np.array([255, 255, 255])
+        mask = cv2.inRange(img_rgb, lower_green, upper_green)
 
-        gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+        # Bitwise-AND mask and original image
+        masked_green = cv2.bitwise_and(image, image, mask=mask)
 
-        # Detect faces in the image
-        faces = face_cascade.detectMultiScale(
-            gray,
-            scaleFactor=1.1,
-            minNeighbors=8,
-            minSize=(30, 30),
-            flags=cv2.CASCADE_SCALE_IMAGE
-        )
+        gray = cv2.cvtColor(masked_green, cv2.COLOR_BGR2GRAY)
 
-        logger.info('Found {0} faces!'.format(len(faces)))
+        # detect circles in the image
+        circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, 1.2, 100)
+        # ensure at least some circles were found
+        if circles is not None:
+            # convert the (x, y) coordinates and radius of the circles to integers
+            circles = np.round(circles[0, :]).astype("int")
+            # loop over the (x, y) coordinates and radius of the circles
+            for (x, y, r) in circles:
+                # draw the circle in the output image, then draw a rectangle
+                # corresponding to the center of the circle
+                cv2.circle(output, (x, y), r, (0, 255, 0), 4)
+                cv2.rectangle(output, (x - 5, y - 5), (x + 5, y + 5), (0, 128, 255), -1)
+            # show the output image
+            cv2.imshow("output", np.hstack([image, output]))
 
-        # Draw a rectangle around the faces
-        for (x, y, w, h) in faces:
-            cv2.rectangle(resized, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
-        cv2.imshow("Faces found", resized)
+        cv2.imshow("Lights", masked_green)
         cv2.waitKey(0)
 
         cv2.destroyAllWindows()
