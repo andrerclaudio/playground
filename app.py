@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO,
 
 logger = logging.getLogger(__name__)
 
-IMAGE_PATH = "./pics/lights.png"
+IMAGE_PATH = "./pics/lights_2.png"
 
 
 class ElapsedTime(object):
@@ -49,6 +49,21 @@ def resize(image, proportion=0.3):
     return resized
 
 
+def centroid_histogram(clt):
+    """
+
+    """
+    # grab the number of different clusters and create a histogram
+    # based on the number of pixels assigned to each cluster
+    num_labels = np.arange(0, len(np.unique(clt.labels_)) + 1)
+    (hist, _) = np.histogram(clt.labels_, bins=num_labels)
+    # normalize the histogram, such that it sums to one
+    hist = hist.astype("float")
+    hist /= hist.sum()
+    # return the histogram
+    return hist
+
+
 def application():
     """" All application has its initialization from here """
     logger.info('Main application is running!')
@@ -58,42 +73,89 @@ def application():
 
     try:
 
-        image = cv2.imread(IMAGE_PATH)
-        output = image.copy()
-        logger.info(f'Original dimensions: {image.shape}')
+        # define a video capture object
+        vid = cv2.VideoCapture(0)
 
-        # Convert to RGB format
-        img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        img_hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        while True:
 
-        # Choose the values based on the color on the point/mark
-        lower_green = np.array([0, 200, 0])
-        upper_green = np.array([255, 255, 255])
-        mask = cv2.inRange(img_rgb, lower_green, upper_green)
+            # Capture the video frame by frame
+            ret, frame = vid.read()
 
-        # Bitwise-AND mask and original image
-        masked_green = cv2.bitwise_and(image, image, mask=mask)
+            # Display the resulting frame
+            # cv2.imshow('frame', frame)
 
-        gray = cv2.cvtColor(masked_green, cv2.COLOR_BGR2GRAY)
+            # Convert to RGB format
+            img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        # detect circles in the image
-        circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, 1.2, 100)
-        # ensure at least some circles were found
-        if circles is not None:
-            # convert the (x, y) coordinates and radius of the circles to integers
-            circles = np.round(circles[0, :]).astype("int")
-            # loop over the (x, y) coordinates and radius of the circles
-            for (x, y, r) in circles:
-                # draw the circle in the output image, then draw a rectangle
-                # corresponding to the center of the circle
-                cv2.circle(output, (x, y), r, (0, 255, 0), 4)
-                cv2.rectangle(output, (x - 5, y - 5), (x + 5, y + 5), (0, 128, 255), -1)
-            # show the output image
-            cv2.imshow("output", np.hstack([image, output]))
+            # Choose the values based on the color on the point/mark
+            lower_green = np.array([0, 150, 0])
+            upper_green = np.array([[140, 255, 35]])
+            filter_green = cv2.inRange(img_rgb, lower_green, upper_green)
 
-        cv2.imshow("Lights", masked_green)
-        cv2.waitKey(0)
+            # cv2.imshow("Lights", filter_green)
+            # cv2.waitKey(0)
 
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+            opening = cv2.morphologyEx(filter_green, cv2.MORPH_OPEN, kernel, iterations=1)
+
+            cnts = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+
+            for c in cnts:
+                # compute the center of the contour
+                m = cv2.moments(c)
+                cx = int(m["m10"] / m["m00"])
+                cy = int(m["m01"] / m["m00"])
+
+                # draw the center of the shape on the image
+                cv2.circle(frame, (cx, cy), 15, (0, 0, 255), 2)
+                # cv2.drawContours(output, [c], 0, (255, 255, 255), 1)
+
+            cv2.imshow("Lights", frame)
+
+            # the 'q' button is set as the quitting button
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+        # image = cv2.imread(IMAGE_PATH)
+        # # image = resize(image, proportion=40)
+        # output = image.copy()
+        # logger.info(f'Original dimensions: {image.shape}')
+        #
+        # # Convert to RGB format
+        # img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        #
+        # # Choose the values based on the color on the point/mark
+        # lower_green = np.array([0, 145, 0])
+        # upper_green = np.array([210, 255, 75])
+        # filter_green = cv2.inRange(img_rgb, lower_green, upper_green)
+        # # cv2.imshow("Filter", filter_green)
+        #
+        # # Bitwise-AND mask and original image
+        # # masked_green = cv2.bitwise_and(img_rgb, img_rgb, mask=filter_green)
+        # # cv2.imshow("Mask", masked_green)
+        #
+        # kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        # opening = cv2.morphologyEx(filter_green, cv2.MORPH_OPEN, kernel, iterations=1)
+        #
+        # cnts = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+        #
+        # for c in cnts:
+        #     # compute the center of the contour
+        #     m = cv2.moments(c)
+        #     cx = int(m["m10"] / m["m00"])
+        #     cy = int(m["m01"] / m["m00"])
+        #
+        #     # draw the center of the shape on the image
+        #     cv2.circle(output, (cx, cy), 15, (0, 0, 255), 2)
+        #     # cv2.drawContours(output, [c], 0, (255, 255, 255), 1)
+        #
+        # cv2.imshow("Output", output)
+        # cv2.waitKey(0)
+
+        # After the loop release the cap object
+        vid.release()
         cv2.destroyAllWindows()
 
     except Exception as e:

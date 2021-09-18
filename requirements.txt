@@ -1,3 +1,4 @@
 pytictoc
 opencv-python
 numpy
+scikit-learn
