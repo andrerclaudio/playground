@@ -89,7 +89,7 @@ def application():
 
             # Choose the values based on the color on the point/mark
             lower_green = np.array([0, 130, 0])
-            upper_green = np.array([[195, 255, 85]])
+            upper_green = np.array([[100, 255, 100]])
             filter_green = cv2.inRange(img_rgb, lower_green, upper_green)
 
             # cv2.imshow("Lights", filter_green)
