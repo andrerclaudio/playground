@@ -5,4 +5,4 @@ scikit-learn
 matplotlib
 seaborn
 keras
-tensorflow
+tensorflow-gpu
