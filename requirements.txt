@@ -2,3 +2,7 @@ pytictoc
 opencv-python
 numpy
 scikit-learn
+matplotlib
+seaborn
+keras
+tensorflow

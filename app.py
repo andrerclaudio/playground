@@ -3,12 +3,23 @@ import logging
 from datetime import timedelta
 
 # Added modules
-import cv2
-import numpy as np
+import matplotlib
+
+matplotlib.use('TkAgg')
+# import matplotlib.pyplot as plt
+
 from pytictoc import TicToc
-
-# Project modules
-
+# import seaborn as sns
+# import keras
+# from keras.models import Sequential
+# from keras.layers import Dense, Conv2D, MaxPool2D, Flatten, Dropout
+# from keras.preprocessing.image import ImageDataGenerator
+# from tensorflow.keras.optimizers import Adam
+# from sklearn.metrics import classification_report, confusion_matrix
+# import tensorflow as tf
+import cv2
+import os
+import numpy as np
 
 # Print in software terminal
 logging.basicConfig(level=logging.INFO,
@@ -17,7 +28,8 @@ logging.basicConfig(level=logging.INFO,
 
 logger = logging.getLogger(__name__)
 
-IMAGE_PATH = "./pics/lights_2.png"
+LABELS = ['on', 'off']
+IMG_SIZE = 224
 
 
 class ElapsedTime(object):
@@ -36,10 +48,7 @@ class ElapsedTime(object):
 
 
 def resize(image, proportion=0.3):
-    """
-
-    """
-
+    """ """
     width = int(image.shape[1] * proportion / 100)
     height = int(image.shape[0] * proportion / 100)
     dim = (width, height)
@@ -49,19 +58,26 @@ def resize(image, proportion=0.3):
     return resized
 
 
-def centroid_histogram(clt):
-    """
+def get_data(data_dir):
+    """ """
+    data = []
 
-    """
-    # grab the number of different clusters and create a histogram
-    # based on the number of pixels assigned to each cluster
-    num_labels = np.arange(0, len(np.unique(clt.labels_)) + 1)
-    (hist, _) = np.histogram(clt.labels_, bins=num_labels)
-    # normalize the histogram, such that it sums to one
-    hist = hist.astype("float")
-    hist /= hist.sum()
-    # return the histogram
-    return hist
+    for label in LABELS:
+
+        path = os.path.join(data_dir, label)
+        class_num = LABELS.index(label)
+
+        for img in os.listdir(path):
+
+            try:
+                img_arr = cv2.imread(os.path.join(path, img))[..., ::-1]  # convert BGR to RGB format
+                resized_arr = cv2.resize(img_arr, (IMG_SIZE, IMG_SIZE))  # Reshaping images to preferred size
+                data.append([resized_arr, class_num])
+
+            except Exception as e:
+                logger.exception(e, exc_info=False)
+
+    return np.array(data, dtype=object)
 
 
 def application():
@@ -71,92 +87,92 @@ def application():
     tm = ElapsedTime()
     image = False
 
+    # define a video file
+    vid = cv2.VideoCapture('./pics/cut.mp4')
+    idx = 1
+
+    while vid.isOpened():
+        ret, frame = vid.read()
+        # Convert to RGB format
+        img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        img_rgb = resize(img_rgb, proportion=50)
+
+        cv2.imwrite('./pics/train/on/on_green_train_{}.jpg'.format(idx), img_rgb, [cv2.IMWRITE_JPEG_QUALITY, 100])
+        idx += 1
+
+        # Display the resulting frame
+        # cv2.imshow('frame', img_rgb)
+        # cv2.waitKey()
+        # break
+
+    # After the loop release the cap object
+    vid.release()
+    cv2.destroyAllWindows()
+
     try:
-
-        # define a video capture object
-        vid = cv2.VideoCapture(0)
-
-        while True:
-
-            # Capture the video frame by frame
-            ret, frame = vid.read()
-
-            # Display the resulting frame
-            # cv2.imshow('frame', frame)
-
-            # Convert to RGB format
-            img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-            # Choose the values based on the color on the point/mark
-            lower_green = np.array([0, 130, 0])
-            upper_green = np.array([[100, 255, 100]])
-            filter_green = cv2.inRange(img_rgb, lower_green, upper_green)
-
-            # cv2.imshow("Lights", filter_green)
-            # cv2.waitKey(0)
-
-            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-            opening = cv2.morphologyEx(filter_green, cv2.MORPH_OPEN, kernel, iterations=1)
-
-            cnts = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            cnts = cnts[0] if len(cnts) == 2 else cnts[1]
-
-            for c in cnts:
-                # compute the center of the contour
-                m = cv2.moments(c)
-                cx = int(m["m10"] / m["m00"])
-                cy = int(m["m01"] / m["m00"])
-
-                # draw the center of the shape on the image
-                cv2.circle(frame, (cx, cy), 15, (0, 0, 255), 2)
-                cv2.drawContours(frame, [c], 0, (255, 255, 255), 1)
-
-            cv2.imshow("Lights", frame)
-
-            # the 'q' button is set as the quitting button
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-
-        # image = cv2.imread(IMAGE_PATH)
-        # # image = resize(image, proportion=40)
-        # output = image.copy()
-        # logger.info(f'Original dimensions: {image.shape}')
+        pass
+        # train = get_data('./pics/train')
+        # val = get_data('./pics/test')
         #
-        # # Convert to RGB format
-        # img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        # x_train = []
+        # y_train = []
+        # x_val = []
+        # y_val = []
         #
-        # # Choose the values based on the color on the point/mark
-        # lower_green = np.array([0, 145, 0])
-        # upper_green = np.array([210, 255, 75])
-        # filter_green = cv2.inRange(img_rgb, lower_green, upper_green)
-        # # cv2.imshow("Filter", filter_green)
+        # for feature, label in train:
+        #     x_train.append(feature)
+        #     y_train.append(label)
         #
-        # # Bitwise-AND mask and original image
-        # # masked_green = cv2.bitwise_and(img_rgb, img_rgb, mask=filter_green)
-        # # cv2.imshow("Mask", masked_green)
+        # for feature, label in val:
+        #     x_val.append(feature)
+        #     y_val.append(label)
         #
-        # kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-        # opening = cv2.morphologyEx(filter_green, cv2.MORPH_OPEN, kernel, iterations=1)
+        # # Normalize the data
+        # x_train = np.array(x_train) / 255
+        # x_val = np.array(x_val) / 255
         #
-        # cnts = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        # cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+        # x_train.reshape(-1, IMG_SIZE, IMG_SIZE, 1)
+        # y_train = np.array(y_train)
         #
-        # for c in cnts:
-        #     # compute the center of the contour
-        #     m = cv2.moments(c)
-        #     cx = int(m["m10"] / m["m00"])
-        #     cy = int(m["m01"] / m["m00"])
+        # x_val.reshape(-1, IMG_SIZE, IMG_SIZE, 1)
+        # y_val = np.array(y_val)
         #
-        #     # draw the center of the shape on the image
-        #     cv2.circle(output, (cx, cy), 15, (0, 0, 255), 2)
-        #     # cv2.drawContours(output, [c], 0, (255, 255, 255), 1)
+        # data_generator = ImageDataGenerator(
+        #     featurewise_center=False,  # set input mean to 0 over the dataset
+        #     samplewise_center=False,  # set each sample mean to 0
+        #     featurewise_std_normalization=False,  # divide inputs by std of the dataset
+        #     samplewise_std_normalization=False,  # divide each input by its std
+        #     zca_whitening=False,  # apply ZCA whitening
+        #     rotation_range=30,  # randomly rotate images in the range (degrees, 0 to 180)
+        #     zoom_range=0.2,  # Randomly zoom image
+        #     width_shift_range=0.1,  # randomly shift images horizontally (fraction of total width)
+        #     height_shift_range=0.1,  # randomly shift images vertically (fraction of total height)
+        #     horizontal_flip=True,  # randomly flip images
+        #     vertical_flip=False)  # randomly flip images
         #
-        # cv2.imshow("Output", output)
-        # cv2.waitKey(0)
-
-        # After the loop release the cap object
-        vid.release()
-        cv2.destroyAllWindows()
+        # data_generator.fit(x_train)
+        #
+        # model = Sequential()
+        # model.add(Conv2D(32, 3, padding="same", activation="relu", input_shape=(224, 224, 3)))
+        # model.add(MaxPool2D())
+        # model.add(Conv2D(32, 3, padding="same", activation="relu"))
+        # model.add(MaxPool2D())
+        # model.add(Conv2D(64, 3, padding="same", activation="relu"))
+        # model.add(MaxPool2D())
+        # model.add(Dropout(0.4))
+        # model.add(Flatten())
+        # model.add(Dense(128, activation="relu"))
+        # model.add(Dense(2, activation="softmax"))
+        # model.summary()
+        # opt = Adam(lr=0.000001)
+        # model.compile(optimizer=opt, loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+        #               metrics=['accuracy'])
+        #
+        # history = model.fit(x_train, y_train, epochs=500, validation_data=(x_val, y_val))
+        #
+        # predictions = model.predict_classes(x_val)
+        # predictions = predictions.reshape(1, -1)[0]
+        # logger.info(classification_report(y_val, predictions, target_names=['Rugby (Class 0)', 'Soccer (Class 1)']))
 
     except Exception as e:
         logger.exception(e, exc_info=False)
