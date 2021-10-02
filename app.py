@@ -35,45 +35,83 @@ class ElapsedTime(object):
         logger.info('< {} >'.format(d))
 
 
-def resize(image, size):
-    """ """
-    # width = int(image.shape[1] * proportion / 100)
-    # height = int(image.shape[0] * proportion / 100)
-    dim = (size, size)
+def center_crop(img, dim):
+    """
 
-    resized = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
-    resized = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
+    """
+    width, height = img.shape[1], img.shape[0]
+
+    crop_width = (dim[0] if dim[0] < img.shape[1] else img.shape[1]) / 2
+    crop_height = dim[1] if dim[1] < img.shape[0] else img.shape[0]
+
+    mid_x, mid_y = int(width / 2), int(height / 2)
+    cw2, ch2 = int(crop_width / 2), int(crop_height / 2)
+
+    crop_img = img[mid_y - ch2:mid_y + ch2, mid_x - cw2:mid_x + cw2]
+
+    return crop_img
+
+
+def resize(image, proportion=None, size=None, gray=False, crop=False):
+    """
+
+    """
+
+    resized = None
+
+    if crop:
+        if proportion:
+            width = int(image.shape[1] * proportion / 100)
+            height = int(image.shape[0] * proportion / 100)
+            dim = (width, height)
+        else:
+            dim = (size, size)
+
+        image = center_crop(image, dim)
+
+    if proportion:
+        width = int(image.shape[1] * proportion / 100)
+        height = int(image.shape[0] * proportion / 100)
+        dim = (width, height)
+        resized = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
+
+    if size:
+        dim = (size, size)
+        resized = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
+
+    if gray:
+        resized = cv2.cvtColor(resized, cv2.COLOR_RGB2GRAY)
+
     logger.debug(f'Resized dimensions: {resized.shape}')
     return resized
 
 
-def generate_dataset():
+def generate_dataset(path):
     """ """
     # define a video file
-    vid = cv2.VideoCapture('./pics/on.mp4')
+    vid = cv2.VideoCapture(path)
     idx = 1
+    counting = 1
+
+    train_test_proportion = 4 / 1
 
     while vid.isOpened():
 
         ret, frame = vid.read()
-
         if ret:
-            # Convert to RGB format
-            img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame = resize(img_rgb, 224)
+            frame = resize(frame, proportion=50, gray=True, crop=True)
+            rel = idx % train_test_proportion
 
-            if idx <= 13:
-                cv2.imwrite('./pics/train/on/on_green_train_{}.jpg'.format(idx), frame,
+            if rel:
+                cv2.imwrite('./pics/train/on/on_green_train_{}.jpg'.format(counting), frame,
                             [cv2.IMWRITE_JPEG_QUALITY, 100])
+                counting += 1
             else:
-                cv2.imwrite('./pics/test/on/on_green_test_{}.jpg'.format(idx - 13), frame,
+                test_idx = int(idx / train_test_proportion)
+                cv2.imwrite('./pics/test/on/on_green_test_{}.jpg'.format(test_idx), frame,
                             [cv2.IMWRITE_JPEG_QUALITY, 100])
 
             idx += 1
-            # Display the resulting frame
-            # cv2.imshow('frame', img_rgb)
-            # cv2.waitKey(0)
-            # break
         else:
             break
 
@@ -89,11 +127,13 @@ class GeneralSettings(object):
 
     def __init__(self):
         self.LABELS = ['on', 'off']
-        self.IMG_SIZE = 224
+        self.PROPORTION = 50
+        self.gray = True
+        self.crop = True
         self.TRAIN_DATA_PATH = './pics/train'
         self.VALIDATION_DATA_PATH = './pics/test'
-        self.NUMBER_TRAIN_SAMPLES = 33
-        self.NUMBER_VALIDATION_SAMPLES = 7
+        self.NUMBER_TRAIN_SAMPLES = 30
+        self.NUMBER_VALIDATION_SAMPLES = 10
         self.EPOCHS = 20
         self.BATCH_SIZE = 1
 
@@ -105,12 +145,14 @@ def application():
     tm = ElapsedTime()
     image = False
 
+    # generate_dataset('./pics/on.mp4', )
+
     try:
 
         if k.image_data_format() == 'channels_first':
-            input_shape = (3, GeneralSettings().IMG_SIZE, GeneralSettings().IMG_SIZE)
+            input_shape = (3, GeneralSettings().PROPORTION, GeneralSettings().PROPORTION)
         else:
-            input_shape = (GeneralSettings().IMG_SIZE, GeneralSettings().IMG_SIZE, 3)
+            input_shape = (GeneralSettings().PROPORTION, GeneralSettings().PROPORTION, 3)
 
         model = Sequential()
         model.add(Conv2D(32, (2, 2), input_shape=input_shape))
@@ -146,13 +188,13 @@ def application():
 
         train_generator = train_data_generator.flow_from_directory(
             GeneralSettings().TRAIN_DATA_PATH,
-            target_size=(GeneralSettings().IMG_SIZE, GeneralSettings().IMG_SIZE),
+            target_size=(GeneralSettings().PROPORTION, GeneralSettings().PROPORTION),
             batch_size=GeneralSettings().BATCH_SIZE,
             class_mode='binary')
 
         validation_generator = test_data_generator.flow_from_directory(
             GeneralSettings().VALIDATION_DATA_PATH,
-            target_size=(GeneralSettings().IMG_SIZE, GeneralSettings().IMG_SIZE),
+            target_size=(GeneralSettings().PROPORTION, GeneralSettings().PROPORTION),
             batch_size=GeneralSettings().BATCH_SIZE,
             class_mode='binary')
 
@@ -176,11 +218,14 @@ def application():
             ret, frame = vid.read()
 
             if ret:
-                image = resize(frame, GeneralSettings().IMG_SIZE)
+                image = resize(frame,
+                               proportion=GeneralSettings().PROPORTION,
+                               gray=GeneralSettings().gray,
+                               crop=GeneralSettings().crop)
 
                 img = np.array(image)
                 img = img / 255.0
-                img = img.reshape(1, GeneralSettings().IMG_SIZE, GeneralSettings().IMG_SIZE, 3)
+                img = img.reshape(1, 240, 240, 3)
                 label = model.predict(img)
                 classes_x = np.argmax(label, axis=1)
                 value = classes_x.item()
