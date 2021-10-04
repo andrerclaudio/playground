@@ -7,7 +7,7 @@ __pycache__/
 *.so
 
 # Video files
-*.mp4
+# *.mp4
 
 # Distribution / packaging
 .Python
