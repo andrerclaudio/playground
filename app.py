@@ -10,6 +10,7 @@ import numpy as np
 from imutils import paths
 from pytictoc import TicToc
 from skimage import feature
+from skimage.metrics import structural_similarity as ssim
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix
 from sklearn.preprocessing import LabelEncoder
@@ -244,6 +245,7 @@ def application():
 
         # define a video capture object
         vid = cv2.VideoCapture(path + '/pics/cut_fast.mp4')
+        last_frame = np.zeros((GeneralSettings().IMG_SIZE, GeneralSettings().IMG_SIZE), dtype=np.uint8)
 
         while vid.isOpened():
 
@@ -251,33 +253,44 @@ def application():
             ret, frame = vid.read()
 
             if ret:
-                output = frame.copy()
+
                 # pre-process the image in the same manner we did earlier
                 image = center_crop(frame, GeneralSettings().IMG_SIZE, GeneralSettings().IMG_SIZE)
                 image = gray(image)
                 image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
 
-                # quantify the image and make predictions based on the extracted features using
-                # the last trained Random Forest
-                features = quantify_image(image)
-                preds = model.predict([features])
-                label = le.inverse_transform(preds)[0]
+                # compute difference
+                score, diff = ssim(image, last_frame, full=True)
 
-                # draw the colored class label on the output image and add it to the set of output images
-                color = (255, 0, 0) if label == 'on' else (0, 0, 255)
+                if score > float(0):
 
-                output = center_crop(output, GeneralSettings().IMG_SIZE, GeneralSettings().IMG_SIZE)
-                cv2.putText(output,
-                            str(label),
-                            (50, 50),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1,
-                            color,
-                            2,
-                            cv2.LINE_4)
+                    # quantify the image and make predictions based on the extracted features using
+                    # the last trained Random Forest
+                    features = quantify_image(image)
+                    preds = model.predict([features])
+                    label = le.inverse_transform(preds)[0]
 
-                # Display the resulting frame
-                cv2.imshow('Board', output)
-                cv2.waitKey(1)
+                    # draw the colored class label on the output image and add it to the set of output images
+                    color = (255, 0, 0) if label == 'on' else (0, 0, 255)
+
+                    logger.info('Different! {} [{}]'.format(label, score))
+                    last_frame = image
+
+                    frame = center_crop(frame, GeneralSettings().IMG_SIZE, GeneralSettings().IMG_SIZE)
+                    cv2.putText(frame,
+                                str(label),
+                                (50, 50),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1,
+                                color,
+                                2,
+                                cv2.LINE_4)
+
+                    # Display the resulting frame
+                    cv2.imshow('Board', frame)
+                    cv2.waitKey(1)
+
+                else:
+                    logger.info('Identical! [{}]'.format(score))
 
             else:
                 break
@@ -287,7 +300,7 @@ def application():
         cv2.destroyAllWindows()
 
     except Exception as e:
-        logger.exception(e, exc_info=False)
+        logger.exception(e)
 
     finally:
         tm.elapsed()
