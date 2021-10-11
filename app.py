@@ -171,8 +171,6 @@ def load_split(path):
         # load the input image, convert it to grayscale, and resize it to 200x200 pixels, ignoring aspect ratio
         image = cv2.imread(image_path)
         image = gray(image)
-        # image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        # image = cv2.resize(image, (200, 200))
 
         # threshold the image such that the drawing appears as white on a black background
         image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
@@ -246,6 +244,7 @@ def application():
         # define a video capture object
         vid = cv2.VideoCapture(path + '/pics/cut_fast.mp4')
         last_frame = np.zeros((GeneralSettings().IMG_SIZE, GeneralSettings().IMG_SIZE), dtype=np.uint8)
+        last_score = 0
 
         while vid.isOpened():
 
@@ -273,7 +272,8 @@ def application():
                     # draw the colored class label on the output image and add it to the set of output images
                     color = (255, 0, 0) if label == 'on' else (0, 0, 255)
 
-                    logger.info('Different! {} [{}]'.format(label, score))
+                    logger.info('Different! {} [{}]'.format(label, abs(score - last_score)))
+                    last_score = score
                     last_frame = image
 
                     frame = center_crop(frame, GeneralSettings().IMG_SIZE, GeneralSettings().IMG_SIZE)

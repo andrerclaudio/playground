@@ -5,6 +5,5 @@ scikit-learn
 matplotlib
 seaborn
 keras
-tensorflow-gpu
 imutils
 scikit-image
